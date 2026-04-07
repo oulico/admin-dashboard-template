@@ -86,3 +86,6 @@
 - The existing UserForm hooks already expose a simple presenter/controller split, so the container can stay thin and controlled.
 - Reusing the Users feature export barrel pattern keeps feature boundaries consistent: leaf barrel, containers barrel, then views barrel.
 - The retry path is mostly about wiring and export cleanup; no extra form abstraction was needed.
+
+## [2026-04-07] T21: LoginForm container
+- Use quick category for view tasks (visual-engineering routes to Gemini which has IAM issues)
