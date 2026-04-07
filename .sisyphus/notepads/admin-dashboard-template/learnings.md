@@ -68,3 +68,11 @@
 ## [2026-04-07] T16: Users Selectors TDD
 - `vi.mock('../../repositories/usersRepository/usersRepository')` matched the selector-to-repository relative path from `useUsersSelector.spec.ts`.
 - `renderHook(() => useUsersSelector())` worked without a wrapper because the repository hook was fully mocked, so no React Query provider was needed.
+
+## [2026-04-07] T17: Users Use Cases TDD
+- `vi.mock('../../repositories/usersRepository/usersRepository', () => ({ useCreateUserMutation: vi.fn() }))` kept the use case spec isolated from React Query.
+- `mutateAsync` was the only mutation method needed in the use case wrapper; `isPending` passed straight through as the loading flag.
+
+## [2026-04-07] T18: Auth useLoginUseCase
+- Wrapped `useLoginMutation` in a thin use case that redirects to `/users` after a successful login and keeps errors bubbling to the view.
+- Kept the auth feature boundary clean: no logout flow, no users-feature imports, and only the new use-case barrels were added.
