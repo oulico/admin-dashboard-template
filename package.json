@@ -1,0 +1,39 @@
+{
+  "name": "admin-dashboard-template",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest",
+    "generate:api": "npx openapi-typescript openapi.yaml -o src/shared/api/generated/api.d.ts",
+    "dep-graph": "depcruise src --output-type dot | dot -T svg > dependency-graph.svg"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "latest",
+    "@tanstack/react-router": "latest",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@tanstack/react-query-devtools": "latest",
+    "@tanstack/router-devtools": "latest",
+    "@tanstack/router-plugin": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/node": "latest",
+    "@vitejs/plugin-react": "latest",
+    "dependency-cruiser": "latest",
+    "eslint": "latest",
+    "eslint-plugin-boundaries": "latest",
+    "jsdom": "latest",
+    "openapi-typescript": "latest",
+    "typescript": "~5.7.0",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}

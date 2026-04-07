@@ -1,0 +1,8 @@
+package.json
+PASS: package.json exists
+node_modules/@tanstack/react-router/package.json
+PASS: react-router installed
+node_modules/zod/package.json
+PASS: zod installed
+node_modules/vitest/package.json
+PASS: vitest installed
