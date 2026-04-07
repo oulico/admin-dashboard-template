@@ -76,3 +76,13 @@
 ## [2026-04-07] T18: Auth useLoginUseCase
 - Wrapped `useLoginMutation` in a thin use case that redirects to `/users` after a successful login and keeps errors bubbling to the view.
 - Kept the auth feature boundary clean: no logout flow, no users-feature imports, and only the new use-case barrels were added.
+
+## [2026-04-07] T19: Users container
+- Successfully implemented the Users container using the Presenter/Controller pattern.
+- Verified that no styling frameworks were used and imports are clean.
+- TypeScript compilation passed without errors.
+
+## [2026-04-07] T20: UserForm container (retry)
+- The existing UserForm hooks already expose a simple presenter/controller split, so the container can stay thin and controlled.
+- Reusing the Users feature export barrel pattern keeps feature boundaries consistent: leaf barrel, containers barrel, then views barrel.
+- The retry path is mostly about wiring and export cleanup; no extra form abstraction was needed.
