@@ -133,14 +133,14 @@ sequenceDiagram
     User->>LoginForm: email, password 입력
     LoginForm->>AuthGateway: login(credentials)
     AuthGateway->>SpringBoot: POST /auth/login
-    SpringBoot-->>AuthGateway: { token, expiresAt }
-    Note over SpringBoot,Browser: Set-Cookie: token=...; HttpOnly; Secure
-    AuthGateway->>Browser: document.cookie (Secure, SameSite)
+    SpringBoot-->>AuthGateway: token + expiresAt
+    Note over SpringBoot,Browser: 서버가 HttpOnly Secure 쿠키 설정
+    AuthGateway->>Browser: document.cookie 저장
     AuthGateway-->>LoginForm: TokenEntity
-    LoginForm->>Browser: redirect → /users
+    LoginForm->>Browser: /users 로 리다이렉트
 
     Note over User,Browser: 이후 모든 API 호출
-    Browser->>SpringBoot: Authorization: Bearer {token}
+    Browser->>SpringBoot: Authorization Bearer token
     Note over SpringBoot: JWT 검증 (실제 보안)
     Note over Browser: 클라이언트 만료 체크는 UX 전용
 ```
