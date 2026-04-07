@@ -60,3 +60,11 @@
 - TanStack Query v5 uses object-form `useQuery({ queryKey, queryFn })` — no positional args.
 - `invalidateQueries({ queryKey })` takes an object with `queryKey` (not a bare array).
 - Gateway instances are module-level singletons, not React state — avoids re-instantiation on every render.
+
+## [2026-04-07] T15: authRepository
+- Added centralized `AUTH_KEYS` plus `useLoginMutation` as a thin gateway-backed mutation hook.
+- Kept auth repository scope narrow: no session query, logout, refresh, or cache invalidation.
+
+## [2026-04-07] T16: Users Selectors TDD
+- `vi.mock('../../repositories/usersRepository/usersRepository')` matched the selector-to-repository relative path from `useUsersSelector.spec.ts`.
+- `renderHook(() => useUsersSelector())` worked without a wrapper because the repository hook was fully mocked, so no React Query provider was needed.
