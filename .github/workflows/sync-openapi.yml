@@ -1,0 +1,59 @@
+name: Sync OpenAPI Spec
+
+on:
+  repository_dispatch:
+    types: [openapi-updated]
+  workflow_dispatch:
+    inputs:
+      spec_url:
+        description: URL to download openapi.yaml from
+        required: true
+        type: string
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Backup current spec
+        run: cp openapi.yaml openapi.yaml.bak
+
+      - name: Download new spec
+        run: curl "${{ github.event.inputs.spec_url || github.event.client_payload.spec_url }}" -o openapi.yaml
+
+      - name: Check for breaking changes
+        id: check-breaking
+        run: |
+          npx oasdiff breaking openapi.yaml.bak openapi.yaml > breaking.txt || true
+          echo "breaking<<EOF" >> "$GITHUB_OUTPUT"
+          cat breaking.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate API types
+        run: npm run generate:api
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/sync-openapi
+          title: 'chore: sync OpenAPI spec from backend'
+          body: |
+            Auto-generated. Breaking changes:
+            ```
+            ${{ steps.check-breaking.outputs.breaking }}
+            ```
+          commit-message: 'chore: sync OpenAPI spec and regenerate types'
