@@ -46,3 +46,12 @@
 
 ## [2026-04-07] T11: RemoteUsersGateway TDD
 - `vi.mock('../../../../externalResources/UsersApi/UsersApi')` matched the gateway-to-externalResources relative path; importing the mocked `UsersApi` after the mock kept the spyable methods stable.
+
+## [2026-04-07] T12: InMemoryUsersGateway TDD
+- `crypto.randomUUID()` works out of the box in vitest's jsdom environment — no polyfill needed.
+- InMemory gateway skips zod schema validation entirely; seed UUIDs don't need to match the strict UUID regex from `UserEntitySchema`.
+- 7 tests cover all 5 CRUD operations including error paths; no mocking required since everything is pure in-memory Map operations.
+
+## [2026-04-07] T13: RemoteAuthGateway
+- Remote auth now validates the login response with `TokenEntitySchema.parse()` before returning it, keeping the feature boundary strict.
+- Client-side cookie writes can only set `Secure` and `SameSite`; `httpOnly` still has to come from the server `Set-Cookie` header.

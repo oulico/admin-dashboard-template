@@ -1,2 +1,1 @@
-export type { IAuthGateway } from './AuthGateway.types'
 export { RemoteAuthGateway } from './RemoteAuthGateway'
