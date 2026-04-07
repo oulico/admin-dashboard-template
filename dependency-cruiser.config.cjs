@@ -59,7 +59,13 @@ module.exports = {
       to: {
         dependencyTypes: ['npm-dev'],
         dependencyTypesNot: ['type-only'],
-        pathNot: ['node_modules/@types/'],
+        pathNot: [
+          'node_modules/@types/',
+          // Devtools are intentionally imported in routes/__root.tsx
+          // and conditionally rendered only in DEV mode
+          'node_modules/@tanstack/react-query-devtools',
+          'node_modules/@tanstack/router-devtools',
+        ],
       },
     },
   ],
