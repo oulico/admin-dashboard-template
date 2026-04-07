@@ -55,3 +55,8 @@
 ## [2026-04-07] T13: RemoteAuthGateway
 - Remote auth now validates the login response with `TokenEntitySchema.parse()` before returning it, keeping the feature boundary strict.
 - Client-side cookie writes can only set `Secure` and `SameSite`; `httpOnly` still has to come from the server `Set-Cookie` header.
+
+## [2026-04-07] T14: usersRepository
+- TanStack Query v5 uses object-form `useQuery({ queryKey, queryFn })` — no positional args.
+- `invalidateQueries({ queryKey })` takes an object with `queryKey` (not a bare array).
+- Gateway instances are module-level singletons, not React state — avoids re-instantiation on every render.

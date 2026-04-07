@@ -1,0 +1,1 @@
+export { useUsersGateway } from './useUsersGateway'

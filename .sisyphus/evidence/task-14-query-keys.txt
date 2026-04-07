@@ -1,0 +1,6 @@
+import { USERS_KEYS } from './usersRepositoryKeys'
+    queryKey: USERS_KEYS.all,
+    queryKey: USERS_KEYS.detail(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEYS.all }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEYS.all }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEYS.all }),
