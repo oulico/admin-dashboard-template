@@ -1,4 +1,4 @@
-import { useLoginMutation } from '../../../repositories/authRepository/authRepository'
+import { useLoginMutation } from '../../../../repositories/authRepository/authRepository'
 
 export const usePresenter = () => {
   const { isPending, isError, error } = useLoginMutation()

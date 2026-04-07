@@ -1,4 +1,4 @@
-import { useLoginUseCase } from '../../../useCases/useLoginUseCase'
+import { useLoginUseCase } from '../../../../useCases/useLoginUseCase'
 
 export const useController = () => {
   const { login } = useLoginUseCase()
