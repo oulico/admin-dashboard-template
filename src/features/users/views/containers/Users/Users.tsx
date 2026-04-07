@@ -4,7 +4,12 @@ import { usePresenter } from './hooks/usePresenter'
 import { useController } from './hooks/useController'
 
 export const Users = () => {
-  useEffect(() => { checkAuthAndRedirect() }, [])
+  useEffect(() => {
+    // Skip auth check in mock mode — no backend available
+    if (import.meta.env.VITE_USE_MOCK !== 'true') {
+      checkAuthAndRedirect()
+    }
+  }, [])
 
   const { users, isLoading, isError } = usePresenter()
   const { handleDelete, isDeleting } = useController()
