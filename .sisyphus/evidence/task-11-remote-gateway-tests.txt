@@ -1,0 +1,16 @@
+
+ RUN  v4.1.2 /Users/jhlee-welabs/Projects/admin-dashboard-template
+
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > fetchAll > maps DTOs to UserEntities 2ms
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > fetchAll > throws if API returns invalid data 1ms
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > fetchById > returns a UserEntity by id 0ms
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > create > creates a user and returns mapped entity 1ms
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > update > updates a user and returns mapped entity 0ms
+ ✓ src/features/users/repositories/usersRepository/UsersGateway/RemoteUsersGateway/RemoteUsersGateway.spec.ts > RemoteUsersGateway > remove > calls delete with correct id 0ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  16:58:27
+   Duration  1.21s (transform 36ms, setup 69ms, import 60ms, tests 6ms, environment 891ms)
+
+Exit: 0

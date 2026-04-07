@@ -43,3 +43,6 @@
 
 ## [2026-04-07] T10: Auth ExternalResources
 - Generated auth types live under `paths['/auth/login']`; `LoginRequest` comes from `post.requestBody.content['application/json']` and `TokenResponse` comes from `post.responses[200].content['application/json']`.
+
+## [2026-04-07] T11: RemoteUsersGateway TDD
+- `vi.mock('../../../../externalResources/UsersApi/UsersApi')` matched the gateway-to-externalResources relative path; importing the mocked `UsersApi` after the mock kept the spyable methods stable.
