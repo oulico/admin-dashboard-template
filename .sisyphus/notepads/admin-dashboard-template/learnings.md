@@ -15,3 +15,20 @@
 - Added shared auth helpers for cookie lookup, JWT expiry checks, and login redirect on missing/expired tokens.
 - Added a singleton React Query client with light retry defaults and shared barrels/placeholders for future exports.
 - Kept the shared lib focused: no auth state context, refresh flow, localStorage, or global query error handlers.
+
+## [2026-04-07] T5: UserEntity TDD
+- RED failed as expected until `UserEntity` existed; GREEN passed with a minimal schema-only domain model.
+- Zod deprecation hints from `.uuid()`/`.email()` were avoided by using explicit regex validation so diagnostics stay clean.
+- `UserEntity.ts` stays dependency-light with a single `zod` import and no extra domain behavior.
+
+## [2026-04-07] T6: TokenEntity TDD
+- RED correctly failed on the missing `TokenEntity` module before the schema was added.
+- `TokenEntity` stayed minimal: only `token` and `expiresAt`, with a single `zod` import and no auth decoding or user linkage.
+- `z.string().datetime()` was sufficient for ISO expiry validation and kept the domain model simple.
+
+## [2026-04-07] T7: ESLint + dep-cruiser
+- ESLint 10.2.0 requires `jiti` devDep to load `eslint.config.ts` (TS config files).
+- `typescript-eslint` v8.58.0 (unified package) works with ESLint 10; no need for separate `@typescript-eslint/eslint-plugin` + `@typescript-eslint/parser`.
+- `eslint-plugin-boundaries` v6.0.2 flat config: use `pattern: ['shared']` in folder mode (default) for FSD element matching.
+- dependency-cruiser v17 backreferences use `$1` syntax (not `\\1`) in `pathNot` to reference `from.path` capture groups.
+- dependency-cruiser v17 removed `--validate` flag; use `--config <file>` only.

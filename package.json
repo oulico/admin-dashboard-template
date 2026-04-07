@@ -17,22 +17,25 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tanstack/react-query-devtools": "latest",
     "@tanstack/router-devtools": "latest",
     "@tanstack/router-plugin": "latest",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
+    "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/node": "latest",
     "@vitejs/plugin-react": "latest",
     "dependency-cruiser": "latest",
     "eslint": "latest",
     "eslint-plugin-boundaries": "latest",
+    "jiti": "^2.6.1",
     "jsdom": "latest",
     "openapi-typescript": "latest",
     "typescript": "~5.7.0",
+    "typescript-eslint": "^8.58.0",
     "vite": "latest",
     "vitest": "latest"
   }
