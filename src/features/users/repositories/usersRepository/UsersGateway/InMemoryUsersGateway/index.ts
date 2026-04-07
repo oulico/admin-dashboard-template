@@ -1,0 +1,1 @@
+export { InMemoryUsersGateway } from './InMemoryUsersGateway'
