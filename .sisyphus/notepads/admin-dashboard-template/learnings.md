@@ -32,3 +32,14 @@
 - `eslint-plugin-boundaries` v6.0.2 flat config: use `pattern: ['shared']` in folder mode (default) for FSD element matching.
 - dependency-cruiser v17 backreferences use `$1` syntax (not `\\1`) in `pathNot` to reference `from.path` capture groups.
 - dependency-cruiser v17 removed `--validate` flag; use `--config <file>` only.
+
+## [2026-04-07] T8: GitHub Actions
+- GitHub Actions workflows can stay credential-free by using only `${{ secrets.* }}` for AWS/S3 deployment inputs.
+- The OpenAPI sync workflow needs an explicit step id/output for breaking-change text if the PR body references it.
+
+## [2026-04-07] T9: Users ExternalResources
+- Generated users types live under `paths['/users']` and `paths['/users/{id}']`, with DTO payloads nested at `requestBody.content['application/json']` and response payloads at `responses[200|201].content['application/json']`.
+- `UserDTO` can be derived from the GET /users/{id} or POST/PUT response shapes; the feature boundary keeps shared/generated imports isolated to `UsersApi.types.ts`.
+
+## [2026-04-07] T10: Auth ExternalResources
+- Generated auth types live under `paths['/auth/login']`; `LoginRequest` comes from `post.requestBody.content['application/json']` and `TokenResponse` comes from `post.responses[200].content['application/json']`.
