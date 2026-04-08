@@ -10,6 +10,7 @@
     "dep-graph": "depcruise src --output-type dot | dot -T svg > dependency-graph.svg"
   },
   "dependencies": {
+    "@suspensive/react": "^3.20.2",
     "@tanstack/react-query": "latest",
     "@tanstack/react-router": "latest",
     "react": "^19.0.0",

@@ -8,17 +8,14 @@ export type UserViewModel = {
 }
 
 export const useUsersSelector = () => {
-  const { data, isLoading, isError, error } = useUsersQuery()
+  const { data } = useUsersQuery()
 
   return {
-    users: (data ?? []).map((entity): UserViewModel => ({
+    users: data.map((entity): UserViewModel => ({
       id: entity.id,
       displayName: entity.name,
       email: entity.email,
       initials: entity.name.slice(0, 2).toUpperCase(),
     })),
-    isLoading,
-    isError,
-    error,
   }
 }

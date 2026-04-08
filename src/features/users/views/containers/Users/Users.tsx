@@ -5,17 +5,13 @@ import { useController } from './hooks/useController'
 
 export const Users = () => {
   useEffect(() => {
-    // Skip auth check in mock mode — no backend available
     if (import.meta.env.VITE_USE_MOCK !== 'true') {
       checkAuthAndRedirect()
     }
   }, [])
 
-  const { users, isLoading, isError } = usePresenter()
+  const { users } = usePresenter()
   const { handleDelete, isDeleting } = useController()
-
-  if (isLoading) return <div>Loading...</div>
-  if (isError) return <div>Error loading users</div>
 
   return (
     <div>

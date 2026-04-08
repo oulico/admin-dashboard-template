@@ -1,11 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUsersGateway } from './hooks/useUsersGateway'
 import { USERS_KEYS } from './usersRepositoryKeys'
 import type { UserEntity } from '../../types/entities/UserEntity'
 
 export const useUsersQuery = () => {
   const gateway = useUsersGateway()
-  return useQuery({
+  return useSuspenseQuery({
     queryKey: USERS_KEYS.all,
     queryFn: (): Promise<UserEntity[]> => gateway.fetchAll(),
   })

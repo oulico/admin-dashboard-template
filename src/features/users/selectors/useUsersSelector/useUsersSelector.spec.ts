@@ -17,9 +17,6 @@ describe('useUsersSelector', () => {
   it('maps entities to view models with correct fields', () => {
     vi.mocked(useUsersQuery).mockReturnValue({
       data: MOCK_USERS,
-      isLoading: false,
-      isError: false,
-      error: null,
     } as ReturnType<typeof useUsersQuery>)
 
     const { result } = renderHook(() => useUsersSelector())
@@ -33,43 +30,11 @@ describe('useUsersSelector', () => {
   it('computes initials from first 2 characters', () => {
     vi.mocked(useUsersQuery).mockReturnValue({
       data: MOCK_USERS,
-      isLoading: false,
-      isError: false,
-      error: null,
     } as ReturnType<typeof useUsersQuery>)
 
     const { result } = renderHook(() => useUsersSelector())
 
     expect(result.current.users[0].initials).toBe('AL')
     expect(result.current.users[1].initials).toBe('BO')
-  })
-
-  it('returns empty array when data is undefined', () => {
-    vi.mocked(useUsersQuery).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-    } as ReturnType<typeof useUsersQuery>)
-
-    const { result } = renderHook(() => useUsersSelector())
-
-    expect(result.current.users).toHaveLength(0)
-    expect(result.current.isLoading).toBe(true)
-  })
-
-  it('propagates isError and error from query', () => {
-    const mockError = new Error('Network failure')
-    vi.mocked(useUsersQuery).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: mockError,
-    } as ReturnType<typeof useUsersQuery>)
-
-    const { result } = renderHook(() => useUsersSelector())
-
-    expect(result.current.isError).toBe(true)
-    expect(result.current.error).toBe(mockError)
   })
 })
