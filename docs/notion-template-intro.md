@@ -181,12 +181,12 @@ graph LR
 
 | 상황 | `OPENAPI_SOURCE` |
 |---|---|
-| 평상시 개발 (배포된 staging) | `https://staging-api.pardocs.com/openapi.json` (기본값) |
+| 평상시·CI·폐쇄망 | `./openapi.json` (기본값, 레포에 커밋된 정적 파일) |
+| 배포된 staging과 일회성 비교 | `https://staging-api.pardocs.com/openapi.json` |
 | Production 스펙으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
 | 로컬에서 백엔드 띄움 | `http://localhost:8000/openapi.json` |
-| 오프라인·부트스트랩 폴백 | `./openapi.json` (정적 파일) |
 
-선호 패턴: **배포된 백엔드의 `/openapi.json`을 그대로 쓴다.** FastAPI가 `/docs`(Swagger UI)를 노출한다는 건 같은 호스트에서 `/openapi.json`도 노출된다는 뜻이므로 추가 작업이 필요 없다. SPA 개발자는 백엔드 코드, Python, 서버 기동, submodule, CI 자동 커밋 같은 것을 하나도 알 필요가 없다 — `.env`에 URL 한 줄만 채우면 끝. 정적 파일은 부트스트랩/오프라인 폴백 용도로만.
+선호 패턴: **정적 파일을 진실의 원천으로 둔다.** 폐쇄망·CI 환경에서 빌드가 외부 fetch에 의존하지 않게 하기 위함. 갱신은 명시적인 PR — 백엔드가 빌드 산출물(이미지 또는 release)에 `openapi.json`을 동봉하면 SPA 레포 측이 받아 커밋. 외부망 dev가 ad-hoc 비교를 원할 때만 `OPENAPI_SOURCE=https://... npm run generate:api`로 덮어쓴다.
 - **References**: `src/shared/api/generated/`, `package.json`(`generate:api` 스크립트), `.env.example`(`OPENAPI_SOURCE`)
 
 ### ADR-06. 코드 조직: FSD + Clean Architecture 하이브리드

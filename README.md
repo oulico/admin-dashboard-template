@@ -238,18 +238,18 @@ npm run dev
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `https://staging-api.pardocs.com/openapi.json` |
+| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `./openapi.json` |
 
-`OPENAPI_SOURCE` 시나리오 (배포된 백엔드의 `/openapi.json`을 쓰는 게 가장 단순):
+`OPENAPI_SOURCE` 시나리오 — 정적 파일이 기본값이다 (폐쇄망·CI 안전):
 
 | 상황 | 값 |
 |---|---|
-| 평상시 개발 (배포된 staging 사용) | `https://staging-api.pardocs.com/openapi.json` |
-| Production 스펙 기준으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
-| 로컬에서 백엔드를 띄움 | `http://localhost:8000/openapi.json` |
-| 오프라인·부트스트랩 폴백 | `./openapi.json` (정적 파일) |
+| 평상시·CI·폐쇄망 | `./openapi.json` (레포에 커밋된 정적 파일) |
+| 배포된 staging schema와 일회성 비교 | `https://staging-api.pardocs.com/openapi.json` |
+| Production 스펙으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
+| 로컬에서 백엔드 띄움 | `http://localhost:8000/openapi.json` |
 
-진실의 원천은 백엔드다. 이 템플릿은 출처를 강제하지 않고 환경변수로 추상화한다. FastAPI는 기본적으로 `/openapi.json`을 노출하므로 Swagger UI(`/docs`)가 보이는 호스트라면 schema도 같은 호스트에서 받을 수 있다.
+정적 파일이 진실의 원천이다. 갱신은 명시적인 PR로 — 외부망 dev가 새 스펙으로 비교가 필요할 때만 ad-hoc으로 URL을 덮어 쓴다 (`OPENAPI_SOURCE=https://... npm run generate:api`). 빌드 단계는 외부 fetch에 의존하지 않는다.
 
 ## Mock 모드
 
