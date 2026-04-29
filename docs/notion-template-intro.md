@@ -174,7 +174,19 @@ graph LR
   - (+) DTO 타입은 백엔드와 동기화, 호출 형태는 자유.
   - (+) `src/shared/api/generated/`는 기계 생성물로 격리(수동 편집 금지) 가능.
   - (−) 호출 보일러플레이트는 직접 작성 (그래서 ExternalResources/Gateway 슬라이스가 존재).
-- **References**: `src/shared/api/generated/`, `package.json`(`generate:api`), `openapi.yaml`
+
+#### 스키마 출처는 환경변수로 추상화
+
+진실의 원천은 백엔드 레포다. 어디서 스키마를 가져올지는 본 템플릿이 강제하지 않고 `OPENAPI_SOURCE` 빌드타임 환경변수로 추상화한다 — URL이거나 로컬 파일 경로. `openapi-typescript`가 둘 다 처리한다.
+
+| 상황 | `OPENAPI_SOURCE` |
+|---|---|
+| 정적 스펙 파일 (가장 단순한 시작) | `./openapi.json` (기본값) |
+| 로컬에서 백엔드 띄움 | `http://localhost:8000/openapi.json` |
+| 백엔드 CI가 자기 레포에 자동 커밋 | `https://raw.githubusercontent.com/<org>/<backend>/main/openapi.json` |
+
+선호 패턴: 백엔드 측 CI가 `python -c "import json; from main import app; json.dump(app.openapi(), open('openapi.json','w'))"` 같은 한 줄로 export → 백엔드 레포 main에 자동 커밋 → SPA는 GitHub raw URL을 가리킴. 이 경우 SPA 개발자는 백엔드를 띄우지도 Python을 깔지도 않는다.
+- **References**: `src/shared/api/generated/`, `package.json`(`generate:api` 스크립트), `.env.example`(`OPENAPI_SOURCE`)
 
 ### ADR-06. 코드 조직: FSD + Clean Architecture 하이브리드
 

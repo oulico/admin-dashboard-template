@@ -222,15 +222,33 @@ npm run dev
 | `npm run dev` | 개발 서버 시작 |
 | `npm run build` | 프로덕션 빌드 → `/dist` |
 | `npm run test` | Vitest 테스트 실행 |
-| `npm run generate:api` | `openapi.yaml` → API 타입 재생성 |
+| `npm run generate:api` | OpenAPI 스키마 → 타입 재생성 (출처는 `OPENAPI_SOURCE` 환경변수) |
 | `npm run dep-graph` | 의존성 그래프 SVG 생성 |
 
 ### 환경변수
 
+런타임 (브라우저로 노출됨, `VITE_` 접두):
+
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `VITE_API_BASE_URL` | Spring Boot API 주소 | `http://localhost:8080` |
+| `VITE_API_BASE_URL` | 백엔드(FastAPI) API 주소 — CORS `allow_origins`에 등록된 origin이어야 함 | `http://localhost:8000` |
 | `VITE_USE_MOCK` | `true`이면 InMemoryGateway 사용 | - |
+
+빌드 시점 (브라우저로 노출되지 않음):
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `./openapi.json` |
+
+`OPENAPI_SOURCE` 시나리오:
+
+| 상황 | 값 |
+|---|---|
+| 정적 스펙 파일을 레포에 둠 (가장 단순한 시작) | `./openapi.json` |
+| 로컬에서 백엔드를 띄움 | `http://localhost:8000/openapi.json` |
+| 백엔드 CI가 자기 레포에 `openapi.json`을 자동 커밋 | `https://raw.githubusercontent.com/<org>/<backend-repo>/main/openapi.json` |
+
+진실의 원천은 백엔드 레포다. 이 템플릿은 출처를 강제하지 않고 환경변수로 추상화한다.
 
 ## Mock 모드
 
