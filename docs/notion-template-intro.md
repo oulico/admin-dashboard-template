@@ -159,7 +159,7 @@ graph LR
 - **Consequences**:
   - (+) 의존성 트리 단순.
   - (+) 어댑터 교체(MSW 등) 시 결합점이 명확.
-  - (−) 인터셉터가 필요한 경우 직접 구현. 현 시점의 토큰 첨부·401 리다이렉트는 래퍼 안에서 직접 처리.
+  - (−) 인터셉터가 필요한 경우 직접 구현 — refresh-on-401, 동시 401 mutex, 토큰 첨부, 만료 체크 등을 래퍼 안에 직접 둔다(ADR-14 참조).
 - **References**: `src/shared/api/httpClient.ts`, `src/shared/api/errorHandler.ts`
 
 ### ADR-05. API 타입: openapi-typescript (타입만 생성)
@@ -292,6 +292,23 @@ graph LR
 - **References**: `Dockerfile`, `nginx/default.conf`, `docker/entrypoint.sh`, `docker-compose.yml`, `scripts/deploy-admin-dashboard.sh`, `.github/workflows/deploy.yml`, `src/shared/lib/runtimeEnv.ts`
 
 > ※ ADR-13의 파일들은 `feat/docker-ecr-deploy` 브랜치 머지 후 `master`에서 보임.
+
+### ADR-14. 인증: access_token 일반 쿠키 + httpClient mutex refresh
+
+- **Decision**: 백엔드(FastAPI, `pardocs-backend`)의 토큰 발급 모델을 그대로 따른다. **access_token**(JWT, 30분)은 응답 body로 받아 SPA가 일반(JS-readable) 쿠키 `token`에 저장하고 `Authorization: Bearer`로 첨부. **refresh_token**(JWT, 30일)은 백엔드가 `Set-Cookie: refresh_token=...; HttpOnly; Secure`로 발행 — JS는 손대지 않고 브라우저가 자동 처리. 401 발생 시 `httpClient`가 `/v1/auth/refresh`를 호출해 access_token을 갱신하고 원 요청을 재시도하며, 동시 401이 다수 떨어져도 refresh는 mutex(단일 Promise 캐시)로 한 번만 호출된다.
+- **Context**: SPA에 axios를 도입할지 검토했다. 동기는 "axios interceptor로 refresh 처리"였다. 그러나 refresh 패턴의 본질(401 → refresh → retry, 동시 호출 dedup)은 라이브러리 무관하며, 본 템플릿엔 이미 `createHttpClient`라는 단일 훅 포인트가 있다. 추가로 백엔드의 토큰 모델을 확인한 결과 refresh_token은 HttpOnly 쿠키로 자동 처리되므로 SPA의 인터셉터 코드량은 30줄 안쪽이면 충분.
+- **Alternatives**:
+  - *axios + interceptor* — 동시 401 dedup은 어차피 직접 구현 필요(자동 아님). 의존성 +13kB, "모든 호출이 axios 인스턴스에 결합" → MSW/Mock 어댑터 교체 비용↑. ADR-04와 충돌.
+  - *access_token을 메모리에만 보관* — XSS 면역에 가까움. 그러나 새로고침마다 refresh 호출 필요 → 라우터 셸에 init-refresh 부트스트랩 추가, 페이지 첫 페인트 지연. 본 템플릿이 노리는 "단순함" 가치와 어긋남.
+  - *access_token을 HttpOnly 쿠키로* — 가장 안전하나 백엔드 변경 + SPA가 토큰을 못 읽어 클라이언트 만료 체크/UX 보조 불가. "백엔드 그대로 간다" 결정과 충돌.
+- **Rationale**: 30분짜리 access_token이 JS-readable이어도 XSS 노출 윈도우가 30분으로 한정. 정작 큰 자산인 refresh_token(30일)은 HttpOnly로 절대 안전. mutex 패턴(`refreshing: Promise<string> | null`)으로 동시성 처리는 라이브러리 없이 30줄. fetch 래퍼는 본 템플릿의 다른 모든 결정(MSW 어댑터, Gateway 패턴, 의존성 최소화)과 정합.
+- **Consequences**:
+  - (+) `Authorization` 헤더 첨부, 401 → refresh → retry, 동시 401 dedup, refresh 실패 시 logout 모두 한 파일에서 끝남.
+  - (+) `/v1/auth/{login,register,refresh}`는 무한 루프 가드 리스트로 명시 — 의도가 코드에 보임.
+  - (+) logout은 백엔드 `POST /v1/auth/logout`을 호출해 서버 측 refresh_token 쿠키도 명시적으로 삭제.
+  - (−) 보호된 엔드포인트가 401 반환 후 refresh 라운드트립 — 만료 직후 첫 요청은 1회 추가 RTT.
+  - (−) `_retried` 플래그가 옵션 타입에 새는 누수(internal 표시로 마크).
+- **References**: `src/shared/api/httpClient.ts`, `src/shared/lib/auth.ts`, `src/features/auth/externalResources/AuthApi/AuthApi.ts`, `src/features/auth/repositories/authRepository/AuthGateway/RemoteAuthGateway/RemoteAuthGateway.ts`, `src/features/auth/useCases/useLogoutUseCase/useLogoutUseCase.ts`, [`pardocs-backend/src/api/auth/router.py`](https://github.com/oulico/pardocs-backend) (백엔드 계약)
 
 ---
 

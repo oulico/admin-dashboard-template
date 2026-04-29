@@ -1,5 +1,11 @@
 import type { TokenEntity } from '../../../types/entities/TokenEntity'
 
+export type LoginCredentials = {
+  email: string
+  password: string
+}
+
 export interface IAuthGateway {
-  login(credentials: { email: string; password: string }): Promise<TokenEntity>
+  login(credentials: LoginCredentials): Promise<TokenEntity>
+  logout(): Promise<void>
 }
