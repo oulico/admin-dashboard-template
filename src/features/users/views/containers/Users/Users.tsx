@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { checkAuthAndRedirect } from '@/shared/lib/auth'
+import { runtimeEnv } from '@/shared/lib'
 import { usePresenter } from './hooks/usePresenter'
 import { useController } from './hooks/useController'
 
 export const Users = () => {
   useEffect(() => {
-    if (import.meta.env.VITE_USE_MOCK !== 'true') {
+    if (runtimeEnv.VITE_USE_MOCK !== 'true') {
       checkAuthAndRedirect()
     }
   }, [])

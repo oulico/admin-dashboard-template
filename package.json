@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest",
-    "generate:api": "npx openapi-typescript openapi.yaml -o src/shared/api/generated/api.d.ts",
+    "generate:api": "npx openapi-typescript ${OPENAPI_SOURCE:-./openapi.json} -o src/shared/api/generated/api.d.ts",
     "dep-graph": "depcruise src --output-type dot | dot -T svg > dependency-graph.svg"
   },
   "dependencies": {

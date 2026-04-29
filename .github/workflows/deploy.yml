@@ -1,43 +1,112 @@
-name: Deploy to S3
+name: Build and Push to ECR, send SSM command for deploy
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Regenerate API types
-        run: npm run generate:api
-
-      - name: Build
-        run: npm run build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ap-northeast-2
 
-      - name: Deploy to S3
-        run: aws s3 sync ./dist s3://${{ secrets.S3_BUCKET }} --delete
+      - name: Login to Amazon ECR
+        id: login-ecr
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Invalidate CloudFront
+      - name: Resolve image tags
+        id: tags
+        if: github.event_name != 'pull_request'
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} \
-            --paths "/*"
+          REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          REPO=$REGISTRY/admin-dashboard-template
+
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "tags=$REPO:prod,$REPO:$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+          else
+            echo "tags=$REPO:staging" >> $GITHUB_OUTPUT
+            echo "deploy_env=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build (PR validation only)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: false
+
+      - name: Build and push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+
+      - name: Deploy to staging
+        if: github.event_name != 'pull_request' && steps.tags.outputs.deploy_env == 'staging'
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.STAGING_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["sudo -u ec2-user bash -c \"cd /home/ec2-user && ./deploy-admin-dashboard.sh staging\""]' \
+            --query "Command.CommandId" \
+            --output text)
+          aws ssm wait command-executed \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ secrets.STAGING_INSTANCE_ID }}
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ secrets.STAGING_INSTANCE_ID }} \
+            --query "Status" \
+            --output text)
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deploy failed with status: $STATUS"
+            exit 1
+          fi
+
+      - name: Deploy to prod
+        if: github.event_name != 'pull_request' && steps.tags.outputs.deploy_env == 'prod'
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.PROD_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["sudo -u ec2-user bash -c \"cd /home/ec2-user && ./deploy-admin-dashboard.sh prod\""]' \
+            --query "Command.CommandId" \
+            --output text)
+          aws ssm wait command-executed \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ secrets.PROD_INSTANCE_ID }}
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ secrets.PROD_INSTANCE_ID }} \
+            --query "Status" \
+            --output text)
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deploy failed with status: $STATUS"
+            exit 1
+          fi

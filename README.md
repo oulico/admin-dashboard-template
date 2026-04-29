@@ -222,15 +222,34 @@ npm run dev
 | `npm run dev` | 개발 서버 시작 |
 | `npm run build` | 프로덕션 빌드 → `/dist` |
 | `npm run test` | Vitest 테스트 실행 |
-| `npm run generate:api` | `openapi.yaml` → API 타입 재생성 |
+| `npm run generate:api` | OpenAPI 스키마 → 타입 재생성 (출처는 `OPENAPI_SOURCE` 환경변수) |
 | `npm run dep-graph` | 의존성 그래프 SVG 생성 |
 
 ### 환경변수
 
+런타임 (브라우저로 노출됨, `VITE_` 접두):
+
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `VITE_API_BASE_URL` | Spring Boot API 주소 | `http://localhost:8080` |
+| `VITE_API_BASE_URL` | 백엔드(FastAPI) API 주소 — CORS `allow_origins`에 등록된 origin이어야 함 | `https://staging-api.pardocs.com` |
 | `VITE_USE_MOCK` | `true`이면 InMemoryGateway 사용 | - |
+
+빌드 시점 (브라우저로 노출되지 않음):
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `./openapi.json` |
+
+`OPENAPI_SOURCE` 시나리오 — 정적 파일이 기본값이다 (폐쇄망·CI 안전):
+
+| 상황 | 값 |
+|---|---|
+| 평상시·CI·폐쇄망 | `./openapi.json` (레포에 커밋된 정적 파일) |
+| 배포된 staging schema와 일회성 비교 | `https://staging-api.pardocs.com/openapi.json` |
+| Production 스펙으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
+| 로컬에서 백엔드 띄움 | `http://localhost:8000/openapi.json` |
+
+정적 파일이 진실의 원천이다. 갱신은 명시적인 PR로 — 외부망 dev가 새 스펙으로 비교가 필요할 때만 ad-hoc으로 URL을 덮어 쓴다 (`OPENAPI_SOURCE=https://... npm run generate:api`). 빌드 단계는 외부 fetch에 의존하지 않는다.
 
 ## Mock 모드
 
@@ -337,6 +356,183 @@ flowchart TD
 | [TanStack Router](https://tanstack.com/router/latest) | 파일 기반 라우팅, SPA 설정 |
 | [TanStack Query](https://tanstack.com/query/latest) | 서버 상태 관리, 캐시 무효화 패턴 |
 | [openapi-typescript](https://openapi-ts.dev/) | OpenAPI → TypeScript 타입 생성 |
+
+## 배포 (Docker + ECR + EC2)
+
+이 템플릿은 nginx 컨테이너로 정적 파일을 서빙하고, ECR에 푸시한 뒤 EC2에서 `docker compose pull && up`으로 갱신하는 흐름을 사용한다.
+
+### 런타임 환경변수 주입
+
+#### 왜 런타임 주입인가
+
+Vite는 `import.meta.env.VITE_*`를 **빌드 시점에 문자열로 인라인**한다. 즉 `npm run build` 결과물(`dist/`)에는 그 시점의 값이 박혀있다. 만약 이 방식만 쓴다면 staging/prod 마다 이미지를 새로 빌드해야 하고, "한 번 만든 이미지를 여러 환경에 배포한다"는 12-Factor 원칙에 어긋난다.
+
+이 템플릿은 **이미지에는 값을 넣지 않고**, 컨테이너가 시작될 때마다 환경값을 주입하도록 구성되어 있다.
+
+#### 주입 흐름
+
+```mermaid
+flowchart LR
+    A["docker run -e<br/>또는 env_file"] -->|"OS env"| B["nginx 컨테이너 시작"]
+    B --> C["/docker-entrypoint.d/<br/>40-render-env-config.sh"]
+    C -->|"VITE_* 만 읽음"| D["/usr/share/nginx/html/<br/>env-config.js 재생성"]
+    D --> E["nginx 기동"]
+    E -->|"GET /env-config.js"| F["브라우저:<br/>window._env_ 채워짐"]
+    F --> G["runtimeEnv 헬퍼가<br/>읽어서 사용"]
+```
+
+핵심 포인트:
+- **이미지에는 값이 박혀있지 않다.** `Dockerfile`은 `npm run build`만 수행하고 빌드 ARG로 `VITE_*`를 받지 않는다. `dist/`에는 `<script src="/env-config.js"></script>` 태그만 있고, 그 파일은 컨테이너 시작 시 동적으로 생성된다.
+- **앱 코드는 `import.meta.env.VITE_*`를 직접 읽지 않는다.** 대신 `runtimeEnv` 헬퍼를 통해 `window._env_` → `import.meta.env`(개발 모드 fallback) → 하드코딩된 기본값 순으로 조회한다.
+- **`VITE_` 접두가 없는 환경변수는 절대 노출되지 않는다.** entrypoint의 `awk` 필터가 `^VITE_`만 매칭한다.
+
+#### 관련 파일
+
+| 파일 | 역할 |
+|---|---|
+| `index.html` | `<script src="/env-config.js"></script>`를 메인 번들 이전에 로드 |
+| `public/env-config.js` | 개발 모드용 placeholder (`window._env_ = window._env_ \|\| {}`). 컨테이너에서는 entrypoint가 이 파일을 덮어씀 |
+| `docker/entrypoint.sh` | nginx 시작 직전 `/usr/share/nginx/html/env-config.js`를 동적 생성. nginx 공식 이미지의 `/docker-entrypoint.d/` 자동 실행 메커니즘 사용 |
+| `src/shared/lib/runtimeEnv.ts` | `window._env_` → `import.meta.env` → 기본값 폴백 헬퍼 |
+| `src/vite-env.d.ts` | `Window._env_` 타입 선언 |
+
+#### 주입 방법 (3가지 컨텍스트)
+
+**1) `docker run`에 직접 전달**
+
+```sh
+docker run --rm -p 8080:80 \
+  -e VITE_API_BASE_URL=https://api.staging.example.com \
+  -e VITE_USE_MOCK=false \
+  admin-dashboard-template:local
+```
+
+**2) `docker compose` + `.env` 파일 (로컬 테스트)**
+
+```sh
+cat > .env <<EOF
+VITE_API_BASE_URL=https://api.staging.example.com
+VITE_USE_MOCK=false
+EOF
+
+IMAGE=admin-dashboard-template:local docker compose up
+```
+
+`docker-compose.yml`에 `env_file: .env`로 선언되어 있어 자동으로 컨테이너에 주입된다.
+
+**3) EC2 (운영 흐름)**
+
+```mermaid
+flowchart LR
+    S3["S3<br/>admin-dashboard.env"] -->|"aws s3 cp"| Disk["EC2:<br/>~/.env"]
+    Disk -->|"compose env_file"| Container["nginx 컨테이너"]
+    Container -->|"entrypoint"| Js["env-config.js"]
+```
+
+`scripts/deploy-admin-dashboard.sh`가 SSM에서 호출되면 다음을 수행한다:
+1. `aws s3 cp s3://...admin-dashboard.env /home/ec2-user/admin-dashboard/.env`
+2. `docker compose pull && up -d` — compose가 그 `.env`를 컨테이너 환경으로 주입
+3. 컨테이너 안에서 entrypoint가 `env-config.js`를 새로 렌더링
+
+**중요:** 환경값을 바꾸려면 **이미지를 다시 굽지 않는다.** S3의 env 파일만 갱신하고 `deploy-admin-dashboard.sh`만 다시 트리거하면(또는 SSM으로 같은 명령 재실행) 새 값이 반영된다.
+
+#### 새 환경변수 추가 절차
+
+1. 이름은 반드시 `VITE_` 접두로 시작 (그렇지 않으면 entrypoint가 노출하지 않음).
+2. `src/vite-env.d.ts`의 `ImportMetaEnv`와 `Window._env_` 타입에 추가.
+3. `src/shared/lib/runtimeEnv.ts`의 `RuntimeEnvKey` 유니언과 `runtimeEnv` 객체에 추가 (기본값 포함).
+4. 앱 코드에서는 `runtimeEnv.<KEY>`로 사용. `import.meta.env.VITE_*`를 직접 읽지 말 것.
+5. `.env.example`에 변수 설명 추가.
+6. S3의 환경별 env 파일에 값 추가 (또는 GitHub PR과 함께 인프라 작업 의뢰).
+
+#### 검증 방법
+
+컨테이너 외부에서 즉시 확인:
+```sh
+curl -s http://<host>/env-config.js
+# 출력 예:
+# window._env_ = {
+#   "VITE_API_BASE_URL": "https://api.staging.example.com",
+#   "VITE_USE_MOCK": "false",
+# };
+```
+
+브라우저 DevTools Console:
+```js
+window._env_
+// → { VITE_API_BASE_URL: "...", VITE_USE_MOCK: "..." }
+```
+
+값이 비어있다면:
+- `docker exec <container> env | grep VITE_`로 컨테이너 내부 env가 실제로 설정되었는지 확인
+- `docker logs <container>` 초기 출력에서 entrypoint 단계 오류 확인
+- compose의 `env_file` 경로가 실제 파일을 가리키는지 확인 (상대경로 주의)
+
+#### 보안 메모
+
+- `VITE_*` 변수는 **클라이언트(브라우저)에 그대로 노출**된다. DB 비밀번호·내부 API 키 같은 시크릿을 절대 넣지 말 것 — 빌드타임 인라인 방식과 동일한 위협 모델이다.
+- 시크릿이 필요한 호출은 백엔드(API 게이트웨이)를 경유해야 한다.
+- entrypoint는 `^VITE_` 매칭만 하므로 의도치 않은 컨테이너 env(`AWS_*`, `HOME`, `PATH` 등)는 자동으로 차단된다.
+
+### 로컬 빌드/실행
+
+```sh
+docker build -t admin-dashboard-template:local .
+
+docker run --rm -p 8080:80 \
+  -e VITE_API_BASE_URL=https://api.example.com \
+  -e VITE_USE_MOCK=false \
+  admin-dashboard-template:local
+
+# 검증
+curl -s http://localhost:8080/env-config.js          # 주입된 값 확인
+curl -sI http://localhost:8080/healthz               # 200 OK
+curl -sI http://localhost:8080/users/123             # 200 (SPA fallback)
+```
+
+또는 compose:
+```sh
+echo "VITE_API_BASE_URL=https://api.example.com" > .env
+echo "VITE_USE_MOCK=false" >> .env
+IMAGE=admin-dashboard-template:local docker compose up
+```
+
+### CI 워크플로 (.github/workflows/deploy.yml)
+
+| 트리거 | 동작 | 태그 |
+|---|---|---|
+| `push: main` | 빌드 → ECR push → SSM이 staging EC2에서 `deploy-admin-dashboard.sh staging` 실행 | `staging` |
+| `push: tags v*` | 빌드 → ECR push → SSM이 prod EC2에서 `deploy-admin-dashboard.sh prod` 실행 | `prod`, `v1.x.y` |
+| `pull_request: main` | 빌드 검증만 (push/deploy 안 함) | — |
+
+필요한 GitHub Secrets:
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — ECR push + SSM send-command 권한
+- `STAGING_INSTANCE_ID`, `PROD_INSTANCE_ID` — EC2 인스턴스 ID
+
+이미지 플랫폼은 `linux/arm64` (Graviton EC2 가정).
+
+### EC2 1회 셋업
+
+각 환경의 EC2 인스턴스에서:
+
+1. Docker + compose 플러그인 설치
+2. EC2 IAM 인스턴스 프로파일에 `AmazonEC2ContainerRegistryReadOnly` + S3 환경파일 read 권한 부여
+3. SSM Agent가 활성화되어 있고 IAM에 `AmazonSSMManagedInstanceCore` 부여
+4. 디렉토리 배치:
+   ```
+   /home/ec2-user/
+   ├── deploy-admin-dashboard.sh         # scripts/deploy-admin-dashboard.sh 복사
+   └── admin-dashboard/
+       └── docker-compose.yml            # 리포의 docker-compose.yml 복사
+   ```
+5. `deploy-admin-dashboard.sh` 안의 `<ACCOUNT_ID>`와 S3 env 경로를 실제 값으로 수정
+6. S3에 환경별 env 파일 업로드 (예: `s3://pardocs/admin-dashboard.env`):
+   ```
+   VITE_API_BASE_URL=https://api.production.example.com
+   VITE_USE_MOCK=false
+   ```
+
+이후 main 브랜치 머지 또는 `v*` 태그 push가 자동 배포를 트리거한다.
 
 ## 라이선스
 
