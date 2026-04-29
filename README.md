@@ -344,12 +344,116 @@ flowchart TD
 
 ### 런타임 환경변수 주입
 
-`import.meta.env.VITE_*`는 빌드 시점에 번들로 인라인되므로, 환경별로 이미지를 새로 빌드하지 않으려면 런타임 주입이 필요하다. 이 템플릿은 `window._env_` 패턴을 사용한다.
+#### 왜 런타임 주입인가
 
-- `index.html`이 메인 번들 이전에 `/env-config.js`를 로드한다.
-- 컨테이너 시작 시 `docker/entrypoint.sh`가 `VITE_*` 접두 환경변수를 읽어 `/usr/share/nginx/html/env-config.js`를 동적 생성한다.
-- 앱 코드는 `runtimeEnv` 헬퍼(`src/shared/lib/runtimeEnv.ts`)를 통해 `window._env_` → `import.meta.env` → 기본값 순으로 폴백한다.
-- 보안: `VITE_` 접두가 없는 변수는 노출되지 않는다.
+Vite는 `import.meta.env.VITE_*`를 **빌드 시점에 문자열로 인라인**한다. 즉 `npm run build` 결과물(`dist/`)에는 그 시점의 값이 박혀있다. 만약 이 방식만 쓴다면 staging/prod 마다 이미지를 새로 빌드해야 하고, "한 번 만든 이미지를 여러 환경에 배포한다"는 12-Factor 원칙에 어긋난다.
+
+이 템플릿은 **이미지에는 값을 넣지 않고**, 컨테이너가 시작될 때마다 환경값을 주입하도록 구성되어 있다.
+
+#### 주입 흐름
+
+```mermaid
+flowchart LR
+    A["docker run -e<br/>또는 env_file"] -->|"OS env"| B["nginx 컨테이너 시작"]
+    B --> C["/docker-entrypoint.d/<br/>40-render-env-config.sh"]
+    C -->|"VITE_* 만 읽음"| D["/usr/share/nginx/html/<br/>env-config.js 재생성"]
+    D --> E["nginx 기동"]
+    E -->|"GET /env-config.js"| F["브라우저:<br/>window._env_ 채워짐"]
+    F --> G["runtimeEnv 헬퍼가<br/>읽어서 사용"]
+```
+
+핵심 포인트:
+- **이미지에는 값이 박혀있지 않다.** `Dockerfile`은 `npm run build`만 수행하고 빌드 ARG로 `VITE_*`를 받지 않는다. `dist/`에는 `<script src="/env-config.js"></script>` 태그만 있고, 그 파일은 컨테이너 시작 시 동적으로 생성된다.
+- **앱 코드는 `import.meta.env.VITE_*`를 직접 읽지 않는다.** 대신 `runtimeEnv` 헬퍼를 통해 `window._env_` → `import.meta.env`(개발 모드 fallback) → 하드코딩된 기본값 순으로 조회한다.
+- **`VITE_` 접두가 없는 환경변수는 절대 노출되지 않는다.** entrypoint의 `awk` 필터가 `^VITE_`만 매칭한다.
+
+#### 관련 파일
+
+| 파일 | 역할 |
+|---|---|
+| `index.html` | `<script src="/env-config.js"></script>`를 메인 번들 이전에 로드 |
+| `public/env-config.js` | 개발 모드용 placeholder (`window._env_ = window._env_ \|\| {}`). 컨테이너에서는 entrypoint가 이 파일을 덮어씀 |
+| `docker/entrypoint.sh` | nginx 시작 직전 `/usr/share/nginx/html/env-config.js`를 동적 생성. nginx 공식 이미지의 `/docker-entrypoint.d/` 자동 실행 메커니즘 사용 |
+| `src/shared/lib/runtimeEnv.ts` | `window._env_` → `import.meta.env` → 기본값 폴백 헬퍼 |
+| `src/vite-env.d.ts` | `Window._env_` 타입 선언 |
+
+#### 주입 방법 (3가지 컨텍스트)
+
+**1) `docker run`에 직접 전달**
+
+```sh
+docker run --rm -p 8080:80 \
+  -e VITE_API_BASE_URL=https://api.staging.example.com \
+  -e VITE_USE_MOCK=false \
+  admin-dashboard-template:local
+```
+
+**2) `docker compose` + `.env` 파일 (로컬 테스트)**
+
+```sh
+cat > .env <<EOF
+VITE_API_BASE_URL=https://api.staging.example.com
+VITE_USE_MOCK=false
+EOF
+
+IMAGE=admin-dashboard-template:local docker compose up
+```
+
+`docker-compose.yml`에 `env_file: .env`로 선언되어 있어 자동으로 컨테이너에 주입된다.
+
+**3) EC2 (운영 흐름)**
+
+```mermaid
+flowchart LR
+    S3["S3<br/>admin-dashboard.env"] -->|"aws s3 cp"| Disk["EC2:<br/>~/.env"]
+    Disk -->|"compose env_file"| Container["nginx 컨테이너"]
+    Container -->|"entrypoint"| Js["env-config.js"]
+```
+
+`scripts/deploy-admin-dashboard.sh`가 SSM에서 호출되면 다음을 수행한다:
+1. `aws s3 cp s3://...admin-dashboard.env /home/ec2-user/admin-dashboard/.env`
+2. `docker compose pull && up -d` — compose가 그 `.env`를 컨테이너 환경으로 주입
+3. 컨테이너 안에서 entrypoint가 `env-config.js`를 새로 렌더링
+
+**중요:** 환경값을 바꾸려면 **이미지를 다시 굽지 않는다.** S3의 env 파일만 갱신하고 `deploy-admin-dashboard.sh`만 다시 트리거하면(또는 SSM으로 같은 명령 재실행) 새 값이 반영된다.
+
+#### 새 환경변수 추가 절차
+
+1. 이름은 반드시 `VITE_` 접두로 시작 (그렇지 않으면 entrypoint가 노출하지 않음).
+2. `src/vite-env.d.ts`의 `ImportMetaEnv`와 `Window._env_` 타입에 추가.
+3. `src/shared/lib/runtimeEnv.ts`의 `RuntimeEnvKey` 유니언과 `runtimeEnv` 객체에 추가 (기본값 포함).
+4. 앱 코드에서는 `runtimeEnv.<KEY>`로 사용. `import.meta.env.VITE_*`를 직접 읽지 말 것.
+5. `.env.example`에 변수 설명 추가.
+6. S3의 환경별 env 파일에 값 추가 (또는 GitHub PR과 함께 인프라 작업 의뢰).
+
+#### 검증 방법
+
+컨테이너 외부에서 즉시 확인:
+```sh
+curl -s http://<host>/env-config.js
+# 출력 예:
+# window._env_ = {
+#   "VITE_API_BASE_URL": "https://api.staging.example.com",
+#   "VITE_USE_MOCK": "false",
+# };
+```
+
+브라우저 DevTools Console:
+```js
+window._env_
+// → { VITE_API_BASE_URL: "...", VITE_USE_MOCK: "..." }
+```
+
+값이 비어있다면:
+- `docker exec <container> env | grep VITE_`로 컨테이너 내부 env가 실제로 설정되었는지 확인
+- `docker logs <container>` 초기 출력에서 entrypoint 단계 오류 확인
+- compose의 `env_file` 경로가 실제 파일을 가리키는지 확인 (상대경로 주의)
+
+#### 보안 메모
+
+- `VITE_*` 변수는 **클라이언트(브라우저)에 그대로 노출**된다. DB 비밀번호·내부 API 키 같은 시크릿을 절대 넣지 말 것 — 빌드타임 인라인 방식과 동일한 위협 모델이다.
+- 시크릿이 필요한 호출은 백엔드(API 게이트웨이)를 경유해야 한다.
+- entrypoint는 `^VITE_` 매칭만 하므로 의도치 않은 컨테이너 env(`AWS_*`, `HOME`, `PATH` 등)는 자동으로 차단된다.
 
 ### 로컬 빌드/실행
 
