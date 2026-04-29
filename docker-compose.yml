@@ -1,0 +1,15 @@
+services:
+  web:
+    image: ${IMAGE:-admin-dashboard-template:local}
+    container_name: admin-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${HOST_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

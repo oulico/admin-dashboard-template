@@ -1,9 +1,8 @@
 import { createHttpClient } from '@/shared/api/httpClient'
+import { runtimeEnv } from '@/shared/lib'
 import type { LoginRequest, TokenResponse } from './AuthApi.types'
 
-const authHttpClient = createHttpClient(
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080',
-)
+const authHttpClient = createHttpClient(runtimeEnv.VITE_API_BASE_URL)
 
 export const AuthApi = {
   login: (body: LoginRequest): Promise<TokenResponse> =>

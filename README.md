@@ -338,6 +338,79 @@ flowchart TD
 | [TanStack Query](https://tanstack.com/query/latest) | 서버 상태 관리, 캐시 무효화 패턴 |
 | [openapi-typescript](https://openapi-ts.dev/) | OpenAPI → TypeScript 타입 생성 |
 
+## 배포 (Docker + ECR + EC2)
+
+이 템플릿은 nginx 컨테이너로 정적 파일을 서빙하고, ECR에 푸시한 뒤 EC2에서 `docker compose pull && up`으로 갱신하는 흐름을 사용한다.
+
+### 런타임 환경변수 주입
+
+`import.meta.env.VITE_*`는 빌드 시점에 번들로 인라인되므로, 환경별로 이미지를 새로 빌드하지 않으려면 런타임 주입이 필요하다. 이 템플릿은 `window._env_` 패턴을 사용한다.
+
+- `index.html`이 메인 번들 이전에 `/env-config.js`를 로드한다.
+- 컨테이너 시작 시 `docker/entrypoint.sh`가 `VITE_*` 접두 환경변수를 읽어 `/usr/share/nginx/html/env-config.js`를 동적 생성한다.
+- 앱 코드는 `runtimeEnv` 헬퍼(`src/shared/lib/runtimeEnv.ts`)를 통해 `window._env_` → `import.meta.env` → 기본값 순으로 폴백한다.
+- 보안: `VITE_` 접두가 없는 변수는 노출되지 않는다.
+
+### 로컬 빌드/실행
+
+```sh
+docker build -t admin-dashboard-template:local .
+
+docker run --rm -p 8080:80 \
+  -e VITE_API_BASE_URL=https://api.example.com \
+  -e VITE_USE_MOCK=false \
+  admin-dashboard-template:local
+
+# 검증
+curl -s http://localhost:8080/env-config.js          # 주입된 값 확인
+curl -sI http://localhost:8080/healthz               # 200 OK
+curl -sI http://localhost:8080/users/123             # 200 (SPA fallback)
+```
+
+또는 compose:
+```sh
+echo "VITE_API_BASE_URL=https://api.example.com" > .env
+echo "VITE_USE_MOCK=false" >> .env
+IMAGE=admin-dashboard-template:local docker compose up
+```
+
+### CI 워크플로 (.github/workflows/deploy.yml)
+
+| 트리거 | 동작 | 태그 |
+|---|---|---|
+| `push: main` | 빌드 → ECR push → SSM이 staging EC2에서 `deploy-admin-dashboard.sh staging` 실행 | `staging` |
+| `push: tags v*` | 빌드 → ECR push → SSM이 prod EC2에서 `deploy-admin-dashboard.sh prod` 실행 | `prod`, `v1.x.y` |
+| `pull_request: main` | 빌드 검증만 (push/deploy 안 함) | — |
+
+필요한 GitHub Secrets:
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — ECR push + SSM send-command 권한
+- `STAGING_INSTANCE_ID`, `PROD_INSTANCE_ID` — EC2 인스턴스 ID
+
+이미지 플랫폼은 `linux/arm64` (Graviton EC2 가정).
+
+### EC2 1회 셋업
+
+각 환경의 EC2 인스턴스에서:
+
+1. Docker + compose 플러그인 설치
+2. EC2 IAM 인스턴스 프로파일에 `AmazonEC2ContainerRegistryReadOnly` + S3 환경파일 read 권한 부여
+3. SSM Agent가 활성화되어 있고 IAM에 `AmazonSSMManagedInstanceCore` 부여
+4. 디렉토리 배치:
+   ```
+   /home/ec2-user/
+   ├── deploy-admin-dashboard.sh         # scripts/deploy-admin-dashboard.sh 복사
+   └── admin-dashboard/
+       └── docker-compose.yml            # 리포의 docker-compose.yml 복사
+   ```
+5. `deploy-admin-dashboard.sh` 안의 `<ACCOUNT_ID>`와 S3 env 경로를 실제 값으로 수정
+6. S3에 환경별 env 파일 업로드 (예: `s3://pardocs/admin-dashboard.env`):
+   ```
+   VITE_API_BASE_URL=https://api.production.example.com
+   VITE_USE_MOCK=false
+   ```
+
+이후 main 브랜치 머지 또는 `v*` 태그 push가 자동 배포를 트리거한다.
+
 ## 라이선스
 
 MIT
