@@ -231,24 +231,25 @@ npm run dev
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `VITE_API_BASE_URL` | 백엔드(FastAPI) API 주소 — CORS `allow_origins`에 등록된 origin이어야 함 | `http://localhost:8000` |
+| `VITE_API_BASE_URL` | 백엔드(FastAPI) API 주소 — CORS `allow_origins`에 등록된 origin이어야 함 | `https://staging-api.pardocs.com` |
 | `VITE_USE_MOCK` | `true`이면 InMemoryGateway 사용 | - |
 
 빌드 시점 (브라우저로 노출되지 않음):
 
 | 변수 | 설명 | 기본값 |
 |---|---|---|
-| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `./openapi.json` |
+| `OPENAPI_SOURCE` | `npm run generate:api`가 읽을 OpenAPI 스키마 위치. URL 또는 로컬 경로 모두 허용 | `https://staging-api.pardocs.com/openapi.json` |
 
-`OPENAPI_SOURCE` 시나리오:
+`OPENAPI_SOURCE` 시나리오 (배포된 백엔드의 `/openapi.json`을 쓰는 게 가장 단순):
 
 | 상황 | 값 |
 |---|---|
-| 정적 스펙 파일을 레포에 둠 (가장 단순한 시작) | `./openapi.json` |
+| 평상시 개발 (배포된 staging 사용) | `https://staging-api.pardocs.com/openapi.json` |
+| Production 스펙 기준으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
 | 로컬에서 백엔드를 띄움 | `http://localhost:8000/openapi.json` |
-| 백엔드 CI가 자기 레포에 `openapi.json`을 자동 커밋 | `https://raw.githubusercontent.com/<org>/<backend-repo>/main/openapi.json` |
+| 오프라인·부트스트랩 폴백 | `./openapi.json` (정적 파일) |
 
-진실의 원천은 백엔드 레포다. 이 템플릿은 출처를 강제하지 않고 환경변수로 추상화한다.
+진실의 원천은 백엔드다. 이 템플릿은 출처를 강제하지 않고 환경변수로 추상화한다. FastAPI는 기본적으로 `/openapi.json`을 노출하므로 Swagger UI(`/docs`)가 보이는 호스트라면 schema도 같은 호스트에서 받을 수 있다.
 
 ## Mock 모드
 

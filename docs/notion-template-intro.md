@@ -177,15 +177,16 @@ graph LR
 
 #### 스키마 출처는 환경변수로 추상화
 
-진실의 원천은 백엔드 레포다. 어디서 스키마를 가져올지는 본 템플릿이 강제하지 않고 `OPENAPI_SOURCE` 빌드타임 환경변수로 추상화한다 — URL이거나 로컬 파일 경로. `openapi-typescript`가 둘 다 처리한다.
+진실의 원천은 백엔드다. 어디서 스키마를 가져올지는 본 템플릿이 강제하지 않고 `OPENAPI_SOURCE` 빌드타임 환경변수로 추상화한다 — URL이거나 로컬 파일 경로. `openapi-typescript`가 둘 다 처리한다.
 
 | 상황 | `OPENAPI_SOURCE` |
 |---|---|
-| 정적 스펙 파일 (가장 단순한 시작) | `./openapi.json` (기본값) |
+| 평상시 개발 (배포된 staging) | `https://staging-api.pardocs.com/openapi.json` (기본값) |
+| Production 스펙으로 타입 고정 | `https://api.pardocs.com/openapi.json` |
 | 로컬에서 백엔드 띄움 | `http://localhost:8000/openapi.json` |
-| 백엔드 CI가 자기 레포에 자동 커밋 | `https://raw.githubusercontent.com/<org>/<backend>/main/openapi.json` |
+| 오프라인·부트스트랩 폴백 | `./openapi.json` (정적 파일) |
 
-선호 패턴: 백엔드 측 CI가 `python -c "import json; from main import app; json.dump(app.openapi(), open('openapi.json','w'))"` 같은 한 줄로 export → 백엔드 레포 main에 자동 커밋 → SPA는 GitHub raw URL을 가리킴. 이 경우 SPA 개발자는 백엔드를 띄우지도 Python을 깔지도 않는다.
+선호 패턴: **배포된 백엔드의 `/openapi.json`을 그대로 쓴다.** FastAPI가 `/docs`(Swagger UI)를 노출한다는 건 같은 호스트에서 `/openapi.json`도 노출된다는 뜻이므로 추가 작업이 필요 없다. SPA 개발자는 백엔드 코드, Python, 서버 기동, submodule, CI 자동 커밋 같은 것을 하나도 알 필요가 없다 — `.env`에 URL 한 줄만 채우면 끝. 정적 파일은 부트스트랩/오프라인 폴백 용도로만.
 - **References**: `src/shared/api/generated/`, `package.json`(`generate:api` 스크립트), `.env.example`(`OPENAPI_SOURCE`)
 
 ### ADR-06. 코드 조직: FSD + Clean Architecture 하이브리드
